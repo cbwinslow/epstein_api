@@ -1,0 +1,60 @@
+app:
+  name: "Epstein OSINT Pipeline"
+  version: "0.1.0"
+  debug: true
+
+storage:
+  data_dir: "./data"
+  downloads_dir: "./data/downloads"
+  processed_dir: "./data/processed"
+
+database:
+  sqlite_path: "./data/state.db"
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+
+celery:
+  broker_url: "redis://localhost:6379/0"
+  result_backend: "redis://localhost:6379/0"
+
+chromadb:
+  persist_directory: "./data/chromadb"
+
+neo4j:
+  uri: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "password"
+  database: "neo4j"
+
+ollama:
+  base_url: "http://localhost:11434"
+  model: "llama2"
+
+openrouter:
+  api_key: ""
+  base_url: "https://openrouter.ai/api/v1"
+  model: "google/gemma-2-9b-ite"
+
+downloader:
+  max_concurrent: 5
+  chunk_size: 8192
+  timeout: 300
+  max_retries: 3
+  retry_backoff: 2.0
+
+ocr:
+  tesseract_path: null
+  surya_enabled: true
+  languages: ["eng"]
+
+vectorization:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  chunk_size: 512
+  chunk_overlap: 50
+
+websocket:
+  host: "0.0.0.0"
+  port: 8001

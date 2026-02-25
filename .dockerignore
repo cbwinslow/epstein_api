@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Docs
+docs/
+*.md
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Data (mounted at runtime)
+data/
+*.db
+*.sqlite
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+logs/
