@@ -24,3 +24,4 @@ venv/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+frontend/next-env.d.ts
