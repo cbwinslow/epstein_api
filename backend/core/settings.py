@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,8 @@ class CeleryConfig(BaseModel):
 
 class ChromaDBConfig(BaseModel):
     persist_directory: Path = Path("./data/chromadb")
+    host: str = "localhost"
+    port: int = 8000
 
 
 class Neo4jConfig(BaseModel):
@@ -110,12 +113,20 @@ class Settings(BaseSettings):
         with open(config_path) as f:
             data: dict[str, Any] = yaml.safe_load(f) or {}
 
+        yaml_redis = data.get("redis", {})
+        redis_host = os.environ.get("REDIS_HOST") or yaml_redis.get("host", "localhost")
+        redis_port_str = os.environ.get("REDIS_PORT")
+        redis_port = int(redis_port_str) if redis_port_str else yaml_redis.get("port", 6379)
+
         return cls(
             app=AppConfig(**data.get("app", {})),
             storage=StorageConfig(**data.get("storage", {})),
             database=DatabaseConfig(**data.get("database", {})),
-            redis=RedisConfig(**data.get("redis", {})),
-            celery=CeleryConfig(**data.get("celery", {})),
+            redis=RedisConfig(host=redis_host, port=redis_port),
+            celery=CeleryConfig(
+                broker_url=f"redis://{redis_host}:{redis_port}/0",
+                result_backend=f"redis://{redis_host}:{redis_port}/0",
+            ),
             chromadb=ChromaDBConfig(**data.get("chromadb", {})),
             neo4j=Neo4jConfig(**data.get("neo4j", {})),
             ollama=OllamaConfig(**data.get("ollama", {})),
@@ -129,5 +140,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    config_path = Path(__file__).parent / "config.yaml"
+    config_path = Path(__file__).parent.parent / "config.yaml"
     return Settings.from_yaml(config_path)

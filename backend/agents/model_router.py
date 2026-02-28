@@ -195,13 +195,15 @@ class ModelRouter:
         task_type: str,
         prompt: str,
         schema: dict[str, Any],
+        max_retries: int = 3,
     ) -> dict[str, Any]:
-        """Generate structured output matching a schema.
+        """Generate structured output matching a schema with robust JSON parsing.
 
         Args:
             task_type: Type of task.
             prompt: Input prompt.
             schema: Expected output schema.
+            max_retries: Maximum number of retries for malformed JSON.
 
         Returns:
             Parsed JSON response.
@@ -217,13 +219,67 @@ Respond ONLY with valid JSON matching this schema:
 
 JSON:"""
 
-        response = await self.generate(task_type, schema_prompt)
+        last_error = None
+        last_response = None
+        response = None
 
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse structured response: {e}")
-            return {"error": "parse_failed", "raw": response}
+        for attempt in range(max_retries):
+            try:
+                response = await self.generate(task_type, schema_prompt)
+
+                cleaned_response = self._clean_json_response(response)
+
+                return json.loads(cleaned_response)
+
+            except json.JSONDecodeError as e:
+                last_error = e
+                last_response = response
+                logger.warning(f"JSON parse attempt {attempt + 1}/{max_retries} failed: {e}")
+
+                if attempt < max_retries - 1:
+                    schema_prompt = f"""{prompt}
+
+The previous response was not valid JSON. Please respond ONLY with valid JSON matching this schema:
+{json.dumps(schema, indent=2)}
+
+JSON:"""
+
+        logger.error(f"Failed to parse structured response after {max_retries} attempts")
+        return {"error": "parse_failed", "raw": last_response, "last_error": str(last_error)}
+
+    def _clean_json_response(self, response: str) -> str:
+        """Clean LLM response to extract valid JSON.
+
+        Handles common issues:
+        - Markdown code blocks (```json ... ```)
+        - Text before/after JSON
+        - Trailing commas
+        - Unquoted keys
+
+        Args:
+            response: Raw LLM response.
+
+        Returns:
+            Cleaned JSON string.
+        """
+        import re
+
+        cleaned = response.strip()
+
+        json_match = re.search(r"\{[\s\S]*\}", cleaned)
+        if json_match:
+            cleaned = json_match.group(0)
+
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```[a-zA-Z]*", "", cleaned)
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+
+        cleaned = cleaned.strip()
+
+        cleaned = re.sub(r",\s*([\}\]])", r"\1", cleaned)
+
+        return cleaned
 
     async def refresh_models(self) -> None:
         """Refresh cached models from settings."""

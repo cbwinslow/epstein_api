@@ -25,6 +25,7 @@ up:
 	@echo "  API:      http://localhost:8000"
 	@echo "  Frontend: http://localhost:3000"
 	@echo "  Neo4j:    http://localhost:7474"
+	@echo "  ChromaDB: http://localhost:8001"
 	@echo "  Redis:    localhost:6379"
 
 down:

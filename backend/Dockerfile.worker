@@ -23,4 +23,4 @@ ENV PYTHONPATH=/app/backend
 ENV PYTHONUNBUFFERED=1
 ENV C_FORCE_ROOT=true
 
-CMD ["uv", "run", "celery", "-A", "workers.celery_app", "worker", "--loglevel=info"]
+CMD ["uv", "run", "celery", "-A", "backend.workers.celery_app", "worker", "--loglevel=info"]

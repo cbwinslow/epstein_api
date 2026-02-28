@@ -74,6 +74,7 @@ docker compose up -d
 ### Step 3: Access the UI
 - **Frontend**: http://localhost:3000
 - **API**: http://localhost:8000
+- **ChromaDB**: http://localhost:8001
 - **Neo4j Browser**: http://localhost:7474 (user: neo4j, pass: password)
 
 ### View Logs

@@ -20,7 +20,7 @@ from backend.core.exceptions import (
     PDFProcessingError,
 )
 from backend.core.processing.router import ProcessingRoute
-from backend.core.schemas import ExtractionMethod
+from backend.core.processing.schemas import ExtractionMethod
 
 logger = logging.getLogger(__name__)
 
