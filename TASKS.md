@@ -39,8 +39,6 @@ docker compose logs -f
 
 ### Priority: High
 
-- [ ] **Fix container restart loops** - Add healthcheck configurations to docker-compose.yml
-- [ ] **Complete API health checks** - Verify all services start in correct order
 - [ ] **Test the full pipeline** - End-to-end test from ingest to knowledge graph
 
 ### Priority: Medium
