@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv packages
+        uses: uv/cache-action@v1
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Run ruff
+        working-directory: backend
+        run: uv run ruff check .
+
+      - name: Run mypy
+        working-directory: backend
+        run: uv run mypy .
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv packages
+        uses: uv/cache-action@v1
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Run pytest
+        working-directory: backend
+        run: uv run pytest --cov=backend --cov-report=xml --cov-fail-under=80
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage.xml
+          fail_ci_if_error: true
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        working-directory: backend
+        run: docker build -t epstein-api:${{ github.sha }} -f Dockerfile .
+
+      - name: Build Worker image
+        working-directory: backend
+        run: docker build -t epstein-worker:${{ github.sha }} -f Dockerfile.worker .
+
+      - name: Build Frontend image
+        working-directory: frontend
+        run: docker build -t epstein-frontend:${{ github.sha }} -f Dockerfile .

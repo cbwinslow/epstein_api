@@ -1,0 +1,25 @@
+# Code Owners
+
+# Default owner for everything
+* @cbwinslow
+
+# Backend
+/backend/ @cbwinslow
+
+# Frontend
+/frontend/ @cbwinslow
+
+# Infrastructure
+/docker-compose.yml @cbwinslow
+/.github/workflows/ @cbwinslow
+
+# Documentation
+/docs/ @cbwinslow
+/README.md @cbwinslow
+
+# Tests
+/tests/ @cbwinslow
+
+# Orchestrator
+/orchestrate.py @cbwinslow
+/launch.sh @cbwinslow
