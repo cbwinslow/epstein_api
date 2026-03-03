@@ -8,16 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files (build context is ./app)
-COPY pyproject.toml uv.lock .python-version ./
+# Copy requirements first for better caching
+COPY requirements.txt ./
 
-# Upgrade pip first to ensure 'uv' can be found and installed
-# Use Docker BuildKit cache mount to cache pip/uv downloads between builds
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir uv && \
-    uv python pin 3.10 && \
-    uv sync --no-install-project
+# Install from local requirements (uses local pip cache if available)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the app
 COPY . .
@@ -29,4 +25,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV C_FORCE_ROOT=true
 
-CMD ["uv", "run", "celery", "-A", "workers.celery_app", "worker", "--loglevel=info"]
+CMD ["python", "-m", "celery", "-A", "workers.celery_app", "worker", "--loglevel=info"]
