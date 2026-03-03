@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -7,17 +8,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt ./
+# Copy dependency files first
+COPY pyproject.toml uv.lock .python-version ./
 
-# Install from local requirements (uses local pip cache if available)
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install uv with BuildKit cache mount for pip downloads
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install uv && \
+    uv python pin 3.10 && \
+    uv sync
 
 # Copy the rest of the app
 COPY . .
 
-# Create symlink to fix imports (app/backend -> app/)
+# Create symlink to fix imports
 RUN ln -sf . backend
 
 ENV PYTHONPATH=/app
@@ -25,4 +29,4 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
