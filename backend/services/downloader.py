@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any
 
 import aiohttp
 
@@ -10,7 +9,6 @@ from backend.core.interfaces import (
     DownloadStatus,
     DownloadTask,
     DownloaderBase,
-    DownloaderProtocol,
 )
 from backend.core.settings import Settings
 
@@ -53,7 +51,6 @@ class AsyncDownloader(DownloaderBase):
             async with session.get(url, headers=headers) as response:
                 response.raise_for_status()
 
-                content_length = response.headers.get("Content-Length")
                 downloaded = dest_path.stat().st_size if dest_path.exists() else 0
 
                 with open(dest_path, "ab" if headers else "wb") as f:

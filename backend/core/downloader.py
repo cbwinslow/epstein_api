@@ -13,8 +13,7 @@ This module provides async file downloading with:
 import asyncio
 import hashlib
 import logging
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -32,7 +31,6 @@ from tenacity import (
 from backend.core.exceptions import (
     DownloadFailedError,
     DownloadTimeoutError,
-    HashMismatchError,
 )
 from backend.core.settings import Settings
 

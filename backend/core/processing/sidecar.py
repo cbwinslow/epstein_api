@@ -6,7 +6,6 @@ Saves processed document metadata and text to JSON files alongside originals.
 
 import json
 import logging
-from datetime import datetime
 from pathlib import Path
 
 from backend.core.processing.schemas import ProcessedDocumentSchema

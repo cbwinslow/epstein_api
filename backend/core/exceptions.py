@@ -9,6 +9,7 @@ import logging
 import traceback
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -279,10 +280,17 @@ class DatabaseConnectionError(DatabaseError):
         original_exception: Exception | None = None,
     ) -> None:
         self.database_type = database_type
-        self.connection_string = connection_string
+        # Strip credentials from the connection string before logging/storing.
+        try:
+            parsed = urlparse(connection_string)
+            safe = parsed._replace(netloc=parsed.hostname or "")
+            safe_url = urlunparse(safe)
+        except Exception:
+            safe_url = "<connection string redacted>"
+        self.connection_string = safe_url
         super().__init__(
             message=f"Failed to connect to {database_type} database",
-            details={"database_type": database_type, "connection_string": connection_string},
+            details={"database_type": database_type, "connection_string": safe_url},
             original_exception=original_exception,
         )
 

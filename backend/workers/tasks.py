@@ -26,8 +26,6 @@ from backend.core.processing.router import (
     route_file,
 )
 from backend.core.processing.schemas import (
-    ExtractionMethod,
-    ProcessingResult,
     ProcessingStatus,
     ProcessedDocumentSchema,
 )

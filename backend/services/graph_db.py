@@ -3,7 +3,7 @@ from typing import Any
 
 from neo4j import GraphDatabase
 
-from backend.core.interfaces import GraphDBBase, GraphDBProtocol
+from backend.core.interfaces import GraphDBBase
 from backend.core.settings import Settings
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,6 @@ from typing import Any, Callable, TypeVar
 from backend.core.interfaces import (
     DownloaderProtocol,
     GraphDBProtocol,
-    ProcessorProtocol,
     StateDBProtocol,
     VectorDBProtocol,
 )

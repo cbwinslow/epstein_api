@@ -1,6 +1,5 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import NotRequired, TypedDict
 
 from pydantic import BaseModel, Field
 

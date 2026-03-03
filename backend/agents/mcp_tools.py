@@ -10,13 +10,12 @@ Provides standardized access to:
 
 import json
 import logging
-from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
 from backend.core.databases.chroma_client import ChromaDBClient
 from backend.core.databases.neo4j_client import Neo4jClient
-from backend.core.processing.sidecar import load_json_sidecar, sidecar_exists
+from backend.core.processing.sidecar import load_json_sidecar
 from backend.core.settings import Settings
 
 logger = logging.getLogger(__name__)
