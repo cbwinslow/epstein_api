@@ -11,10 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml uv.lock .python-version ./
 
 # Upgrade pip first to ensure 'uv' can be found and installed
-RUN pip install --no-cache-dir --upgrade pip && \
+# Use Docker BuildKit cache mount to cache pip/uv downloads between builds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir uv && \
     uv python pin 3.10 && \
-    uv sync
+    uv sync --no-install-project
 
 # Copy the rest of the app
 COPY . .

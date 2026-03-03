@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml uv.lock ./
-COPY .python-version ./
+# Build context is project root, so paths include backend/
+COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
 
 # Upgrade pip first to ensure 'uv' can be found and installed
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -16,11 +16,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
     uv python pin 3.10 && \
     uv sync
 
-COPY . ./backend/
+COPY backend/ ./backend/
+COPY app/ ./app/
 
-ENV PYTHONPATH=/app/backend
+# Create symlinks so both app and backend modules work
+RUN ln -sf /app/backend /app/app
+
+# Set PYTHONPATH to include both app and backend
+ENV PYTHONPATH=/app:/app/backend
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Try backend first (which has the full code), then app
+CMD ["sh", "-c", "uv run uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 || uv run uvicorn app.api.main:app --host 0.0.0.0 --port 8000"]

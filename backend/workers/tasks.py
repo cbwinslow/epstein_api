@@ -234,3 +234,49 @@ def _update_file_status(
                 (status.value, file_id),
             )
         conn.commit()
+
+
+@celery_app.task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=3,
+    name="epstein.download_file",
+)
+def download_file_task(self, url: str, dest_path: str) -> dict:
+    """Download a file from URL.
+    
+    Args:
+        url: The URL to download.
+        dest_path: Local destination path.
+        
+    Returns:
+        Dictionary with download result.
+    """
+    import asyncio
+    from pathlib import Path
+    from backend.core.settings import get_settings
+    from backend.core.downloader import AsyncDownloader
+    
+    settings = get_settings()
+    
+    async def _download():
+        downloader = AsyncDownloader(settings)
+        await downloader.initialize()
+        result = await downloader.download(url, Path(dest_path))
+        await downloader.close()
+        return result
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        task = loop.run_until_complete(_download())
+        return {
+            "url": url,
+            "dest_path": dest_path,
+            "status": task.status.value,
+            "bytes_downloaded": task.bytes_downloaded,
+            "error": task.error_message,
+        }
+    finally:
+        loop.close()

@@ -11,6 +11,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api import router
+from backend.api.ingest import router as ingest_router
+from backend.api.process import router as process_router
 from backend.core.settings import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -117,6 +119,16 @@ async def lifespan(app: FastAPI):
         logger.error("Failed to connect to ChromaDB after max retries")
         raise RuntimeError("ChromaDB connection failed")
 
+    logger.info("Initializing database...")
+    try:
+        from backend.services.state_db import SQLiteStateDB
+
+        db = SQLiteStateDB(settings)
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise RuntimeError(f"Database initialization failed: {e}")
+
     logger.info("All dependencies ready - API accepting traffic")
 
     yield
@@ -139,6 +151,8 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(ingest_router)
+app.include_router(process_router)
 
 
 @app.get("/")

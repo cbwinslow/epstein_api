@@ -55,16 +55,30 @@ def sanitize_path(dest_path: Path, allowed_base: Path) -> Path:
     Raises:
         ValueError: If the path would escape the allowed base directory.
     """
-    # Resolve to absolute path and normalize
+    # If already absolute, check it directly
+    if dest_path.is_absolute():
+        # Check for directory traversal in the path itself
+        if ".." in str(dest_path):
+            raise ValueError(f"Path traversal attempt detected: {dest_path}")
+        
+        # Ensure absolute path is within allowed base
+        try:
+            dest_path.resolve().relative_to(allowed_base.resolve())
+        except ValueError:
+            raise ValueError(f"Path {dest_path} escapes allowed directory {allowed_base}")
+        
+        return dest_path.resolve()
+    
+    # For relative paths, resolve and check
     resolved = (allowed_base / dest_path).resolve()
 
     # Check for directory traversal attempts
-    if ".." in str(dest_path) or dest_path.is_absolute():
+    if ".." in str(dest_path):
         raise ValueError(f"Path traversal attempt detected: {dest_path}")
 
     # Ensure final path is within allowed base
     try:
-        resolved.relative_to(allowed_base)
+        resolved.relative_to(allowed_base.resolve())
     except ValueError:
         raise ValueError(f"Path {dest_path} escapes allowed directory {allowed_base}")
 
@@ -181,7 +195,7 @@ class DownloadLedger:
     async def get_task_by_url(self, url: str) -> DownloadTask | None:
         """Get a task by URL."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM download_tasks WHERE source_url = ?",
                 (url,),
@@ -194,7 +208,7 @@ class DownloadLedger:
     async def get_task_by_hash(self, hash_value: str) -> DownloadTask | None:
         """Get a task by SHA-256 hash (for deduplication)."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM download_tasks WHERE sha256_hash = ? AND status = ?",
                 (hash_value, DownloadStatus.COMPLETED.value),
@@ -207,7 +221,7 @@ class DownloadLedger:
     async def get_incomplete_tasks(self) -> list[DownloadTask]:
         """Get all incomplete tasks for resume on startup."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute(
                 """
                 SELECT * FROM download_tasks 
@@ -248,7 +262,7 @@ class DownloadLedger:
     async def get_all_tasks(self) -> list[DownloadTask]:
         """Get all tasks."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM download_tasks") as cursor:
                 rows = await cursor.fetchall()
                 return [self._row_to_task(row) for row in rows]
@@ -341,6 +355,16 @@ class AsyncDownloader:
         async with self._semaphore:
             # Sanitize path to prevent directory traversal
             allowed_base = self._settings.storage.downloads_dir
+            
+            # Convert relative paths to absolute within allowed_base
+            if not dest_path.is_absolute():
+                # Try relative to current working directory first
+                resolved = Path.cwd() / dest_path
+                if not resolved.exists():
+                    # Try relative to /data (Docker mount point)
+                    resolved = Path("/data") / dest_path
+                dest_path = resolved
+            
             dest_path = sanitize_path(dest_path, allowed_base)
 
             dest_path.parent.mkdir(parents=True, exist_ok=True)

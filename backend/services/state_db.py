@@ -90,7 +90,13 @@ class SQLiteStateDB(StateDBBase):
             retries=row["retries"],
             error_message=row["error_message"],
             sha256_hash=row["sha256_hash"],
+            processing_method=row["processing_method"]
+            if "processing_method" in row.keys()
+            else None,
         )
+
+    def get_task_by_url(self, url: str) -> DownloadTask | None:
+        return self.get_task(url)
 
     def get_all_tasks(self) -> list[DownloadTask]:
         conn = self._get_conn()
@@ -103,6 +109,9 @@ class SQLiteStateDB(StateDBBase):
                 retries=row["retries"],
                 error_message=row["error_message"],
                 sha256_hash=row["sha256_hash"],
+                processing_method=row["processing_method"]
+                if "processing_method" in row.keys()
+                else None,
             )
             for row in rows
         ]
