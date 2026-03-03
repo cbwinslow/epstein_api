@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import graph
-from backend.api import ingest
+from backend.api import router as graph_router
+from backend.api.ingest import router as ingest_router
 from backend.core.settings import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -38,8 +38,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(graph.router)
-app.include_router(ingest.router)
+app.include_router(graph_router)
+app.include_router(ingest_router)
 
 
 @app.get("/")
