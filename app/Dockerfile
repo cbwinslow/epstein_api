@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -11,9 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy dependency files first
 COPY pyproject.toml uv.lock .python-version ./
 
-# Install uv with BuildKit cache mount for pip downloads
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
+# Install uv and dependencies (use pip cache from previous builds)
+RUN pip install --upgrade pip && \
     pip install uv && \
     uv python pin 3.10 && \
     uv sync
