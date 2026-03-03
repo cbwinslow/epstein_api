@@ -5,11 +5,12 @@ This module contains the main processing task that orchestrates
 file routing, extraction, and JSON sidecar creation.
 """
 
+import asyncio
 import logging
 import time
 from pathlib import Path
 
-from backend.core.downloader import DownloadStatus
+from backend.core.downloader import AsyncDownloader, DownloadStatus
 from backend.core.exceptions import (
     OCRProcessingError,
     PDFProcessingError,
@@ -234,3 +235,50 @@ def _update_file_status(
                 (status.value, file_id),
             )
         conn.commit()
+
+
+@celery_app.task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=3,
+    name="epstein.download_file",
+)
+def download_file_task(self, url: str, dest_path: str) -> dict:
+    """Download a file from URL to destination.
+
+    This Celery task runs the async downloader in a synchronous context.
+
+    Args:
+        url: URL to download from.
+        dest_path: Destination path for the file.
+
+    Returns:
+        Dictionary with download result.
+    """
+    from backend.core.settings import get_settings
+    
+    try:
+        settings = get_settings()
+        
+        async def _download():
+            downloader = AsyncDownloader(settings)
+            await downloader.initialize()
+            return await downloader.download(url, Path(dest_path))
+        
+        # Run async download in sync context
+        loop = asyncio.new_event_loop()
+        try:
+            task = loop.run_until_complete(_download())
+            return {
+                "url": task.source_url,
+                "status": task.status.value,
+                "dest_path": task.local_filepath,
+                "sha256": task.sha256_hash,
+            }
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        logger.error(f"Download failed for {url}: {e}")
+        raise

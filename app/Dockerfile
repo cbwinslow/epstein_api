@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml uv.lock ./
-COPY .python-version ./
+# Copy dependency files (build context is ./app)
+COPY pyproject.toml uv.lock .python-version ./
 
 # Upgrade pip first to ensure 'uv' can be found and installed
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -16,7 +16,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
     uv python pin 3.10 && \
     uv sync
 
+# Copy the rest of the app
 COPY . .
+
+# Create symlink to fix imports (app/backend -> app/)
+RUN ln -sf . backend
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

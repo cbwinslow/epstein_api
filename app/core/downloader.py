@@ -43,7 +43,6 @@ def sanitize_path(dest_path: Path, allowed_base: Path) -> Path:
     """Sanitize file path to prevent directory traversal attacks.
 
     Ensures the resolved path stays within the allowed base directory.
-    Rejects paths containing '..' or absolute paths.
 
     Args:
         dest_path: The destination path to sanitize.
@@ -55,16 +54,30 @@ def sanitize_path(dest_path: Path, allowed_base: Path) -> Path:
     Raises:
         ValueError: If the path would escape the allowed base directory.
     """
-    # Resolve to absolute path and normalize
+    # If already absolute, check it directly
+    if dest_path.is_absolute():
+        # Check for directory traversal in the path itself
+        if ".." in str(dest_path):
+            raise ValueError(f"Path traversal attempt detected: {dest_path}")
+        
+        # Resolve and ensure absolute path is within allowed base
+        try:
+            dest_path.resolve().relative_to(allowed_base.resolve())
+        except ValueError:
+            raise ValueError(f"Path {dest_path} escapes allowed directory {allowed_base}")
+        
+        return dest_path.resolve()
+    
+    # For relative paths, resolve and check
     resolved = (allowed_base / dest_path).resolve()
 
     # Check for directory traversal attempts
-    if ".." in str(dest_path) or dest_path.is_absolute():
+    if ".." in str(dest_path):
         raise ValueError(f"Path traversal attempt detected: {dest_path}")
 
     # Ensure final path is within allowed base
     try:
-        resolved.relative_to(allowed_base)
+        resolved.relative_to(allowed_base.resolve())
     except ValueError:
         raise ValueError(f"Path {dest_path} escapes allowed directory {allowed_base}")
 

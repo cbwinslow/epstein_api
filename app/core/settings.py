@@ -1,9 +1,10 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,9 +19,41 @@ class StorageConfig(BaseModel):
     downloads_dir: Path = Path("./data/downloads")
     processed_dir: Path = Path("./data/processed")
 
+    @model_validator(mode='after')
+    def resolve_paths(self):
+        """Resolve paths based on environment or Docker mount."""
+        # Check env var first
+        data_dir = os.environ.get("EPSTEIN_STORAGE__DATA_DIR")
+        if not data_dir:
+            # Check if /data exists (Docker mount)
+            if Path("/data").exists():
+                data_dir = "/data"
+            else:
+                data_dir = str(self.data_dir)
+        
+        self.data_dir = Path(data_dir)
+        self.downloads_dir = self.data_dir / "downloads"
+        self.processed_dir = self.data_dir / "processed"
+        return self
+
 
 class DatabaseConfig(BaseModel):
     sqlite_path: Path = Path("./data/state.db")
+
+    @model_validator(mode='after')
+    def resolve_path(self):
+        """Resolve path based on environment or Docker mount."""
+        # Check env var first
+        sqlite_path = os.environ.get("EPSTEIN_DATABASE__SQLITE_PATH")
+        if not sqlite_path:
+            # Check if /data exists (Docker mount)
+            if Path("/data").exists():
+                sqlite_path = "/data/state.db"
+            else:
+                sqlite_path = str(self.sqlite_path)
+        
+        self.sqlite_path = Path(sqlite_path)
+        return self
 
 
 class RedisConfig(BaseModel):
@@ -36,6 +69,21 @@ class CeleryConfig(BaseModel):
 
 class ChromaDBConfig(BaseModel):
     persist_directory: Path = Path("./data/chromadb")
+
+    @model_validator(mode='after')
+    def resolve_path(self):
+        """Resolve path based on environment or Docker mount."""
+        # Check env var first
+        persist_dir = os.environ.get("EPSTEIN_CHROMADB__PERSIST_DIRECTORY")
+        if not persist_dir:
+            # Check if /data exists (Docker mount)
+            if Path("/data").exists():
+                persist_dir = "/data/chromadb"
+            else:
+                persist_dir = str(self.persist_directory)
+        
+        self.persist_directory = Path(persist_dir)
+        return self
 
 
 class Neo4jConfig(BaseModel):

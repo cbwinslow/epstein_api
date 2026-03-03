@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api import graph
+from backend.api import ingest
 from backend.core.settings import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +39,7 @@ app.add_middleware(
 )
 
 app.include_router(graph.router)
+app.include_router(ingest.router)
 
 
 @app.get("/")
