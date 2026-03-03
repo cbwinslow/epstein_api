@@ -2,9 +2,8 @@ import logging
 from typing import Any
 
 import chromadb
-from chromadb.config import Settings as ChromaSettings
 
-from backend.core.interfaces import VectorDBBase, VectorDBProtocol
+from backend.core.interfaces import VectorDBBase
 from backend.core.settings import Settings
 
 logger = logging.getLogger(__name__)

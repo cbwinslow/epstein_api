@@ -28,7 +28,7 @@ chromadb:
 neo4j:
   uri: "bolt://neo4j:7687"
   username: "neo4j"
-  password: "password"
+  password: ""
   database: "neo4j"
 
 ollama:

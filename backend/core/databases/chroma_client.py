@@ -6,14 +6,13 @@ vector storage with ChromaDB.
 """
 
 import logging
-from pathlib import Path
 from typing import Any
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from sentence_transformers import SentenceTransformer
 
-from backend.core.exceptions import DatabaseConnectionError, DatabaseQueryError
+from backend.core.exceptions import DatabaseQueryError
 from backend.core.settings import Settings
 
 logger = logging.getLogger(__name__)

@@ -10,7 +10,6 @@ Provides enterprise-grade logging with:
 
 import json
 import logging
-import os
 import sys
 import traceback
 from datetime import datetime, timezone
@@ -199,15 +198,6 @@ def log_ai_trace(
         model: Model used
         token_usage: Dict with prompt_tokens, completion_tokens, total_tokens
     """
-    extra = {
-        "trace_type": "ai_trace",
-        "agent_name": agent_name,
-        "prompt": prompt,
-        "response": response,
-        "model": model,
-        "token_usage": token_usage,
-    }
-
     extra_record = logging.LogRecord(
         name=logger.name,
         level=logging.INFO,

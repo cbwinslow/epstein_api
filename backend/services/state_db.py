@@ -1,19 +1,15 @@
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any
 
 from backend.core.interfaces import (
     DownloadStatus,
     DownloadTask,
     StateDBBase,
-    StateDBProtocol,
 )
 from backend.core.settings import Settings
 from backend.migrations.migrations import (
-    MigrationVersion,
     get_all_migrations,
-    get_migration_sql,
 )
 
 logger = logging.getLogger(__name__)

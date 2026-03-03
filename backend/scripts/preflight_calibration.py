@@ -199,7 +199,7 @@ class PreflightCalibration:
 
         try:
             client = Neo4jClient(self._settings)
-            result = client.execute_query("RETURN 1 AS test")
+            client.execute_query("RETURN 1 AS test")
             client.close()
 
             duration = (time.perf_counter() - start) * 1000
@@ -234,7 +234,7 @@ class PreflightCalibration:
             client = ChromaDBClient(self._settings)
             try:
                 client._get_client().heartbeat()
-            except Exception as inner_e:
+            except Exception:
                 client._get_client().get_or_create_collection("_test_connection")
             client.close()
 
@@ -318,7 +318,7 @@ class PreflightCalibration:
                     duration_ms=0,
                 )
             )
-            print(f"  [FAIL] OpenRouter: No API key")
+            print("  [FAIL] OpenRouter: No API key")
             return
 
         try:
@@ -348,7 +348,7 @@ class PreflightCalibration:
                         duration_ms=duration,
                     )
                 )
-                print(f"  [FAIL] OpenRouter: 401 Unauthorized")
+                print("  [FAIL] OpenRouter: 401 Unauthorized")
             elif response.status_code == 429:
                 self._report.add(
                     DiagnosticResult(
@@ -359,7 +359,7 @@ class PreflightCalibration:
                         duration_ms=duration,
                     )
                 )
-                print(f"  [WARN] OpenRouter: 429 Rate Limited")
+                print("  [WARN] OpenRouter: 429 Rate Limited")
             elif response.status_code == 200:
                 data = response.json()
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -449,7 +449,7 @@ class PreflightCalibration:
                     duration_ms=duration,
                 )
             )
-            print(f"  [PASS] Sidecar: Created dummy file")
+            print("  [PASS] Sidecar: Created dummy file")
         except Exception as e:
             duration = (time.perf_counter() - start) * 1000
             self._report.add(
@@ -474,7 +474,7 @@ class PreflightCalibration:
                     message="Skipped - no dummy sidecar",
                 )
             )
-            print(f"  [SKIP] FactExtractor: No sidecar")
+            print("  [SKIP] FactExtractor: No sidecar")
             return
 
         start = time.perf_counter()
@@ -530,7 +530,7 @@ class PreflightCalibration:
                     message="Skipped - no extraction result",
                 )
             )
-            print(f"  [SKIP] GraphArchitect: No extraction")
+            print("  [SKIP] GraphArchitect: No extraction")
             return
 
         start = time.perf_counter()
@@ -603,8 +603,8 @@ class PreflightCalibration:
             "",
             "## Summary",
             "",
-            f"| Status | Count |",
-            f"|--------|-------|",
+            "| Status | Count |",
+            "|--------|-------|",
             f"| ✅ Pass | {len(passes)} |",
             f"| ⚠️  Warning | {len(warnings)} |",
             f"| ❌ Fail | {len(failures)} |",
@@ -651,22 +651,22 @@ class PreflightCalibration:
             for r in failures + warnings:
                 if "Redis" in r.name:
                     lines.append(
-                        f"- **Redis**: Ensure Redis is running via Docker: `docker-compose up -d redis`"
+                        "- **Redis**: Ensure Redis is running via Docker: `docker-compose up -d redis`"
                     )
                 elif "Neo4j" in r.name:
                     lines.append(
-                        f"- **Neo4j**: Ensure Neo4j is running via Docker: `docker-compose up -d neo4j`"
+                        "- **Neo4j**: Ensure Neo4j is running via Docker: `docker-compose up -d neo4j`"
                     )
                 elif "ChromaDB" in r.name:
-                    lines.append(f"- **ChromaDB**: Check ChromaDB service availability")
+                    lines.append("- **ChromaDB**: Check ChromaDB service availability")
                 elif "Binaries" in r.name:
                     lines.append(
-                        f"- **Binaries**: Install missing tools: `apt-get install tesseract-ocr ffmpeg`"
+                        "- **Binaries**: Install missing tools: `apt-get install tesseract-ocr ffmpeg`"
                     )
                 elif "OpenRouter" in r.name:
-                    lines.append(f"- **OpenRouter**: Check API key in .env file")
+                    lines.append("- **OpenRouter**: Check API key in .env file")
                 elif "FactExtractor" in r.name or "GraphArchitect" in r.name:
-                    lines.append(f"- **Agents**: Check LLM connectivity and agent configuration")
+                    lines.append("- **Agents**: Check LLM connectivity and agent configuration")
                 else:
                     lines.append(f"- **{r.name}**: Review configuration")
         else:
@@ -677,7 +677,7 @@ class PreflightCalibration:
                 "",
                 "---",
                 "",
-                f"*Report generated by preflight_calibration.py*",
+                "*Report generated by preflight_calibration.py*",
             ]
         )
 

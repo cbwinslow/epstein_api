@@ -22,7 +22,6 @@ from backend.agents.mcp_tools import MCPTools
 from backend.agents.telemetry import TelemetryLogger
 from backend.core.exceptions import AgentParsingError
 from backend.core.processing.sidecar import load_json_sidecar
-from backend.core.schemas import ExtractedEntitiesOutput
 from backend.core.settings import Settings
 
 logger = logging.getLogger(__name__)

@@ -53,10 +53,16 @@ class ProcessedDocumentSchema(BaseModel):
     language_detected: str | None = None
     errors: list[str] = Field(default_factory=list)
 
-    @field_validator("character_count", "page_count", mode="before")
+    @field_validator("character_count", "word_count", mode="before")
     @classmethod
-    def validate_positive(cls, v: Any) -> int | None:
-        """Ensure values are non-negative."""
+    def validate_non_negative_int(cls, v: Any) -> int:
+        """Ensure count values are non-negative integers."""
+        return max(0, int(v or 0))
+
+    @field_validator("page_count", mode="before")
+    @classmethod
+    def validate_optional_non_negative(cls, v: Any) -> int | None:
+        """Ensure page_count is non-negative if provided."""
         if v is None:
             return None
         return max(0, int(v))

@@ -10,6 +10,7 @@ from typing import Any
 from neo4j import GraphDatabase
 
 from backend.core.exceptions import DatabaseConnectionError, DatabaseQueryError
+from backend.core.schemas import RelationshipType
 from backend.core.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -271,19 +272,40 @@ class Neo4jClient:
         entity_name: str,
         rel_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Find all relationships for an entity."""
-        if rel_type:
-            cypher = """
-            MATCH (p {name: $name})-[r:$rel_type]->(target)
-            RETURN p, r, target
-            """
-        else:
-            cypher = """
-            MATCH (p {name: $name})-[r]->(target)
-            RETURN p, r, target
-            """
+        """Find all relationships for an entity.
 
-        return self.execute_query(cypher, {"name": entity_name, "rel_type": rel_type})
+        Args:
+            entity_name: Name of the entity to search.
+            rel_type: Optional relationship type filter. Must be a valid
+                RelationshipType value to prevent Cypher injection.
+
+        Returns:
+            List of relationship records.
+
+        Raises:
+            ValueError: If rel_type is not a recognised RelationshipType value.
+        """
+        if rel_type is not None:
+            # Cypher does not support parameterising relationship type labels.
+            # Validate against the enum allowlist before embedding in the query.
+            valid_types = {rt.value for rt in RelationshipType}
+            if rel_type not in valid_types:
+                raise ValueError(
+                    f"Invalid relationship type: {rel_type!r}. "
+                    f"Must be one of: {sorted(valid_types)}"
+                )
+            # Safe to embed: rel_type is validated against the allowlist above.
+            cypher = f"""
+            MATCH (p {{name: $name}})-[r:{rel_type}]->(target)
+            RETURN p, r, target
+            """
+            return self.execute_query(cypher, {"name": entity_name})
+
+        cypher = """
+        MATCH (p {name: $name})-[r]->(target)
+        RETURN p, r, target
+        """
+        return self.execute_query(cypher, {"name": entity_name})
 
     def get_graph_stats(self) -> dict[str, int]:
         """Get graph statistics."""
