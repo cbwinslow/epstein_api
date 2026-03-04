@@ -110,6 +110,10 @@ class DownloaderConfig(BaseModel):
     timeout: int = 300
     max_retries: int = 3
     retry_backoff: float = 2.0
+    # DOJ Age Verification Cookies
+    justice_gov_age_verified: str = "true"
+    ak_bmsc: str = ""
+    queue_it_accepted: str = ""
 
 
 class OCRConfig(BaseModel):
