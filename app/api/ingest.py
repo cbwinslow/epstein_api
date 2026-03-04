@@ -94,6 +94,7 @@ async def add_urls(request: AddURLsRequest) -> list[TaskResponse]:
     """Add multiple URLs to the download queue."""
     try:
         from backend.core.interfaces import DownloadTask
+        from backend.workers.tasks import download_file_task
 
         db = get_db()
         settings = get_settings()
@@ -102,6 +103,7 @@ async def add_urls(request: AddURLsRequest) -> list[TaskResponse]:
         for url in request.urls:
             url_hash = hash(url) % 10000000
             dest_path = settings.storage.downloads_dir / f"file_{url_hash}_{Path(url).name}"
+            abs_dest_path = str(dest_path.resolve())
 
             task = DownloadTask(
                 url=url,
@@ -111,12 +113,15 @@ async def add_urls(request: AddURLsRequest) -> list[TaskResponse]:
             )
 
             db.save_task(task)
+            
+            # Dispatch to Celery worker for download
+            celery_task = download_file_task.delay(url, abs_dest_path)
 
             results.append(
                 TaskResponse(
                     url=url,
                     status=DownloadStatus.PENDING.value,
-                    dest_path=str(dest_path),
+                    dest_path=abs_dest_path,
                 )
             )
 

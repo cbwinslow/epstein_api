@@ -65,8 +65,17 @@ class RedisConfig(BaseSettings):
 
 class CeleryConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EPSTEIN_CELERY__", extra="ignore")
-    broker_url: str = "redis://localhost:6379/0"
-    result_backend: str = "redis://localhost:6379/0"
+    broker_url: str = ""  # Will be set from redis settings if empty
+    result_backend: str = ""  # Will be set from redis settings if empty
+    
+    @model_validator(mode="after")
+    def resolve_from_redis(self):
+        """If broker_url/result_backend not set, derive from redis settings."""
+        if not self.broker_url:
+            self.broker_url = "redis://redis:6379/0"
+        if not self.result_backend:
+            self.result_backend = "redis://redis:6379/0"
+        return self
 
 
 class ChromaDBConfig(BaseModel):
