@@ -1,60 +1,93 @@
+# Epstein OSINT Pipeline Configuration
+# 
+# This file can be customized for your environment.
+# All paths can be relative (to this file) or absolute.
+#
+# Examples:
+#   Relative: "./data" or "data"
+#   Absolute Linux/Mac: "/home/user/epstein/data"
+#   Absolute Windows: "C:\\Users\\User\\epstein\\data"
+#   Docker: "/data"
+#
+# Environment variables take precedence over this file.
+# Use EPSTEIN_ prefix with double underscore for nested:
+#   EPSTEIN_STORAGE__DATA_DIR=/custom/path
+#   EPSTEIN_REDIS__HOST=my-redis
+
 app:
   name: "Epstein OSINT Pipeline"
   version: "0.1.0"
   debug: true
 
+# Storage configuration
+# Relative paths are resolved relative to this config file
 storage:
   data_dir: "./data"
   downloads_dir: "./data/downloads"
   processed_dir: "./data/processed"
 
+# SQLite database
 database:
   sqlite_path: "./data/state.db"
 
+# Redis configuration
 redis:
-  host: "redis"
+  host: "localhost"
   port: 6379
   db: 0
 
+# Celery task queue
 celery:
-  broker_url: "redis://redis:6379/0"
-  result_backend: "redis://redis:6379/0"
+  broker_url: "redis://localhost:6379/0"
+  result_backend: "redis://localhost:6379/0"
 
+# ChromaDB vector database
 chromadb:
   persist_directory: "./data/chromadb"
 
+# Neo4j graph database
 neo4j:
-  uri: "bolt://neo4j:7687"
+  uri: "bolt://localhost:7687"
   username: "neo4j"
   password: "password"
   database: "neo4j"
 
+# Ollama local LLM (optional)
 ollama:
   base_url: "http://localhost:11434"
   model: "llama2"
 
+# OpenRouter API (optional)
 openrouter:
   api_key: ""
   base_url: "https://openrouter.ai/api/v1"
   model: "google/gemma-2-9b-ite"
 
+# Downloader settings
 downloader:
   max_concurrent: 5
   chunk_size: 8192
   timeout: 300
   max_retries: 3
   retry_backoff: 2.0
+  # DOJ Age Verification - set via environment variables for security
+  # EPSTEIN_DOWNLOAD_GOV_AGEER__JUSTICE_VERIFIED=true
+  # EPSTEIN_DOWNLOADER__AK_BMSC=...
+  # EPSTEIN_DOWNLOADER__QUEUE_IT_ACCEPTED=...
 
+# OCR settings
 ocr:
   tesseract_path: null
   surya_enabled: true
   languages: ["eng"]
 
+# Vectorization settings
 vectorization:
   model: "sentence-transformers/all-MiniLM-L6-v2"
   chunk_size: 512
   chunk_overlap: 50
 
+# WebSocket settings
 websocket:
   host: "0.0.0.0"
   port: 8001

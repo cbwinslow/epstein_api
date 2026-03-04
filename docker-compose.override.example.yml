@@ -1,0 +1,26 @@
+# Example override for local development (non-Docker)
+# Copy to docker-compose.override.yml and modify as needed
+#
+# Usage:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   # Edit the file with your local settings
+#   docker compose up -d
+#
+# Note: docker-compose.override.yml is automatically loaded by docker compose
+
+services:
+  api:
+    environment:
+      # Use localhost for local development
+      - EPSTEIN_REDIS__HOST=localhost
+      - EPSTEIN_NEO4J__URI=bolt://localhost:7687
+      - EPSTEIN_CELERY__BROKER_URL=redis://localhost:6379/0
+      - EPSTEIN_CELERY__RESULT_BACKEND=redis://localhost:6379/0
+
+  worker:
+    environment:
+      # Use localhost for local development
+      - EPSTEIN_REDIS__HOST=localhost
+      - EPSTEIN_NEO4J__URI=bolt://localhost:7687
+      - EPSTEIN_CELERY__BROKER_URL=redis://localhost:6379/0
+      - EPSTEIN_CELERY__RESULT_BACKEND=redis://localhost:6379/0

@@ -56,13 +56,15 @@ class DatabaseConfig(BaseModel):
         return self
 
 
-class RedisConfig(BaseModel):
+class RedisConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_REDIS__", extra="ignore")
     host: str = "localhost"
     port: int = 6379
     db: int = 0
 
 
-class CeleryConfig(BaseModel):
+class CeleryConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_CELERY__", extra="ignore")
     broker_url: str = "redis://localhost:6379/0"
     result_backend: str = "redis://localhost:6379/0"
 
@@ -86,25 +88,29 @@ class ChromaDBConfig(BaseModel):
         return self
 
 
-class Neo4jConfig(BaseModel):
+class Neo4jConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_NEO4J__", extra="ignore")
     uri: str = "bolt://localhost:7687"
     username: str = "neo4j"
     password: str = "password"
     database: str = "neo4j"
 
 
-class OllamaConfig(BaseModel):
+class OllamaConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_OLLAMA__", extra="ignore")
     base_url: str = "http://localhost:11434"
     model: str = "llama2"
 
 
-class OpenRouterConfig(BaseModel):
+class OpenRouterConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_OPENROUTER__", extra="ignore")
     api_key: str = ""
     base_url: str = "https://openrouter.ai/api/v1"
     model: str = "google/gemma-2-9b-ite"
 
 
-class DownloaderConfig(BaseModel):
+class DownloaderConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_DOWNLOADER__", extra="ignore")
     max_concurrent: int = 5
     chunk_size: int = 8192
     timeout: int = 300
@@ -116,27 +122,38 @@ class DownloaderConfig(BaseModel):
     queue_it_accepted: str = ""
 
 
-class OCRConfig(BaseModel):
+class OCRConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_OCR__", extra="ignore")
     tesseract_path: str | None = None
     surya_enabled: bool = True
     languages: list[str] = ["eng"]
 
 
-class VectorizationConfig(BaseModel):
+class VectorizationConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_VECTORIZATION__", extra="ignore")
     model: str = "sentence-transformers/all-MiniLM-L6-v2"
     chunk_size: int = 512
     chunk_overlap: int = 50
 
 
-class WebSocketConfig(BaseModel):
+class WebSocketConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EPSTEIN_WEBSOCKET__", extra="ignore")
     host: str = "0.0.0.0"
     port: int = 8001
 
 
 class Settings(BaseSettings):
+    """Main settings class.
+    
+    Environment variables take precedence over config.yaml values.
+    Use EPSTEIN_ prefix with double underscore for nested:
+      EPSTEIN_REDIS__HOST=redis
+      EPSTEIN_STORAGE__DATA_DIR=/data
+    """
     model_config = SettingsConfigDict(
         env_prefix="EPSTEIN_",
         env_nested_delimiter="__",
+        extra="ignore",
     )
 
     app: AppConfig = AppConfig()
@@ -155,33 +172,101 @@ class Settings(BaseSettings):
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> "Settings":
+        """Load settings from YAML file.
+        
+        Note: Nested configs (redis, celery, etc.) are initialized from environment
+        variables, not from YAML. Only app-level settings come from YAML.
+        """
         config_path = Path(path)
-        if not config_path.exists():
-            return cls()
-
-        with open(config_path) as f:
-            data: dict[str, Any] = yaml.safe_load(f) or {}
-
+        
+        # Always create fresh instances - env vars take precedence
+        # Only app-level config can come from YAML
+        app_data = {}
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    data: dict[str, Any] = yaml.safe_load(f) or {}
+                    app_data = data.get("app", {})
+            except Exception:
+                pass
+        
         return cls(
-            app=AppConfig(**data.get("app", {})),
-            storage=StorageConfig(**data.get("storage", {})),
-            database=DatabaseConfig(**data.get("database", {})),
-            redis=RedisConfig(**data.get("redis", {})),
-            celery=CeleryConfig(**data.get("celery", {})),
-            chromadb=ChromaDBConfig(**data.get("chromadb", {})),
-            neo4j=Neo4jConfig(**data.get("neo4j", {})),
-            ollama=OllamaConfig(**data.get("ollama", {})),
-            openrouter=OpenRouterConfig(**data.get("openrouter", {})),
-            downloader=DownloaderConfig(**data.get("downloader", {})),
-            ocr=OCRConfig(**data.get("ocr", {})),
-            vectorization=VectorizationConfig(**data.get("vectorization", {})),
-            websocket=WebSocketConfig(**data.get("websocket", {})),
+            app=AppConfig(**app_data),
         )
+
+
+def _find_config_path() -> Path:
+    """Find config.yaml in standard locations.
+    
+    Searches in order:
+    1. EPSTEIN_CONFIG_PATH environment variable
+    2. Current working directory
+    3. Script directory (for Docker    4. Project root (parent)
+ of app directory)
+    """
+    # Check environment variable first
+    config_from_env = os.environ.get("EPSTEIN_CONFIG_PATH")
+    if config_from_env:
+        config_path = Path(config_from_env)
+        if config_path.exists():
+            return config_path.resolve()
+    
+    # Check current directory
+    config_path = Path("./config.yaml")
+    if config_path.exists():
+        return config_path.resolve()
+    
+    # Check script directory (Docker: /app/config.yaml)
+    script_dir = Path(__file__).parent.parent
+    config_path = script_dir / "config.yaml"
+    if config_path.exists():
+        return config_path.resolve()
+    
+    # Check parent of script directory (project root)
+    project_root = Path(__file__).parent.parent.parent
+    config_path = project_root / "config.yaml"
+    if config_path.exists():
+        return config_path.resolve()
+    
+    # Return default path (will use YAML defaults if not found)
+    return script_dir / "config.yaml"
+
+
+def _detect_environment() -> str:
+    """Detect if running in Docker or locally.
+    
+    Returns:
+        "docker" - Running in Docker container
+        "windows" - Running on Windows locally
+        "linux" - Running on Linux/macOS locally
+    """
+    # Check for Docker indicators
+    if Path("/.dockerenv").exists() or os.environ.get("DOCKER_CONTAINER"):
+        return "docker"
+    
+    # Check for Windows
+    if os.name == "nt" or os.environ.get("OS", "").startswith("Windows"):
+        return "windows"
+    
+    return "linux"
 
 
 @lru_cache
 def get_settings() -> Settings:
-    # Config is in /app/config.yaml (not /app/core/config.yaml)
-    # Due to symlink: backend -> . (in /app), backend/core/settings.py resolves to core/settings.py
-    config_path = Path(__file__).parent.parent.parent / "config.yaml"
+    """Get application settings.
+    
+    Uses EPSTEIN_CONFIG_PATH env var, config.yaml, or defaults.
+    Path resolution works automatically for Docker and local (Windows/Linux).
+    """
+    config_path = _find_config_path()
+    env_type = _detect_environment()
+    
+    # For Docker, check if /data exists and use absolute paths
+    if env_type == "docker":
+        if Path("/data").exists():
+            # Update defaults for Docker
+            os.environ.setdefault("EPSTEIN_STORAGE__DATA_DIR", "/data")
+            os.environ.setdefault("EPSTEIN_DATABASE__SQLITE_PATH", "/data/state.db")
+            os.environ.setdefault("EPSTEIN_CHROMADB__PERSIST_DIRECTORY", "/data/chromadb")
+    
     return Settings.from_yaml(config_path)
