@@ -326,8 +326,20 @@ class AsyncDownloader:
                 connect=30,
                 sock_read=30,
             )
-            self._session = aiohttp.ClientSession(timeout=timeout)
+            cookies = aiohttp.CookieJar()
+            self._session = aiohttp.ClientSession(
+                timeout=timeout,
+                cookie_jar=cookies,
+            )
         return self._session
+    
+    def _get_headers(self) -> dict:
+        """Get headers for download requests including DOJ cookies."""
+        return {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/pdf,*/*",
+            "Cookie": "justiceGovAgeVerified=true; ak_bmsc=B943A36DF49F0F92AF744F6B84C1930A~000000000000000000000000000000~YAAQtonMF7oe9bKcAQAAK475uB9eVbj3Jpg9QSzgYCE+Q7iT7NT+yhJHaY9lQBeH/O9mR/Q7jtRM4gJa9OeiBeey9T4xrOFyxG8euFUEFUsDbuvD3Z0c7G804CheN8D/MGEb7cfzkAgW7TCT0Ty4Mwtoss2RYpOF6VD6H3zmng1BEFFkiswpivVXYZNr76MDorBlQxY3K9BXQs/yhAvHA2xC9AxnfT2CwC+nMF9bVlKJA3NGj5+XKbQrLUKg/ALjj5YQI0zmNgzVV0BjHPNboGtuM45qt/BjbIbeS0oyYD7fFBIERAXgVd4pQKLGXcJPuzrbIbN+hq3VyzOq3LXkLrya0+Zst/vcMBLnIn6IfEiMtbIGVPw6M/fiHlfNqZ6srmEDJ4IM2T988UQK7Q==; QueueITAccepted-SDFrts345E-V3_usdojfiles=EventId%3Ausdojfiles%26RedirectType%3Dsafetynet%26IssueTime%3D1772630490%26Hash%3De7452db3e0b184b895c79541f81023837b65ba6d8b717b2adc8dea98ffd341f8",
+        }
 
     async def download(
         self,
@@ -411,7 +423,7 @@ class AsyncDownloader:
         await self._ledger.update_task(task)
 
         session = await self._get_session()
-        headers = {}
+        headers = self._get_headers()
 
         if dest_path.exists() and dest_path.stat().st_size > 0:
             existing_size = dest_path.stat().st_size
@@ -424,12 +436,12 @@ class AsyncDownloader:
         total_bytes: int | None = None
 
         try:
-            async with session.get(task.url, headers=headers) as response:
+            async with session.get(task.url, headers=self._get_headers()) as response:
                 if response.status == 416:  # Range not satisfiable
                     dest_path.unlink()
                     downloaded = 0
                     task.bytes_downloaded = 0
-                    async with session.get(task.url) as response:
+                    async with session.get(task.url, headers=self._get_headers()) as response:
                         total_bytes = int(response.headers.get("Content-Length", 0))
                         task.total_bytes = total_bytes
                         async for chunk in response.content.iter_chunked(
