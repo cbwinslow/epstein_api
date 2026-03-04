@@ -12,9 +12,9 @@ from unittest.mock import MagicMock
 import pytest
 
 
-# Add backend to path for imports
-BACKEND_PATH = Path(__file__).parent.parent / "backend"
-sys.path.insert(0, str(BACKEND_PATH.parent))
+# Add app to path for imports
+APP_PATH = Path(__file__).parent.parent / "app"
+sys.path.insert(0, str(APP_PATH))
 
 
 @pytest.fixture(scope="session", autouse=True)

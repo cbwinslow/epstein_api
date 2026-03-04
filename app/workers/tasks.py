@@ -67,7 +67,7 @@ def process_document_task(self, file_id: int, force_ocr: bool = False) -> dict:
     try:
         with get_db_connection() as conn:
             cursor = conn.execute(
-                "SELECT source_url, local_filepath, status FROM download_tasks WHERE id = ?",
+                "SELECT url, dest_path, status FROM download_tasks WHERE id = ?",
                 (file_id,),
             )
             row = cursor.fetchone()
@@ -76,13 +76,13 @@ def process_document_task(self, file_id: int, force_ocr: bool = False) -> dict:
                 logger.error(f"File not found in ledger: {file_id}")
                 return {"error": "File not found", "file_id": file_id}
 
-            source_url, local_filepath, status = row
+            url, dest_path, status = row
 
             if status != DownloadStatus.COMPLETED.value:
                 logger.warning(f"File not ready for processing: {file_id} (status: {status})")
                 return {"error": "File not completed", "file_id": file_id}
 
-        file_path = Path(local_filepath)
+        file_path = Path(dest_path)
 
         if not file_path.exists():
             logger.error(f"File not found on disk: {file_path}")
@@ -257,28 +257,31 @@ def download_file_task(self, url: str, dest_path: str) -> dict:
         Dictionary with download result.
     """
     from backend.core.settings import get_settings
-    
+
     try:
         settings = get_settings()
-        
+
         async def _download():
             downloader = AsyncDownloader(settings)
             await downloader.initialize()
-            return await downloader.download(url, Path(dest_path))
-        
+            try:
+                return await downloader.download(url, Path(dest_path))
+            finally:
+                await downloader.close()
+
         # Run async download in sync context
         loop = asyncio.new_event_loop()
         try:
             task = loop.run_until_complete(_download())
             return {
-                "url": task.source_url,
+                "url": task.url,
                 "status": task.status.value,
-                "dest_path": task.local_filepath,
+                "dest_path": task.dest_path,
                 "sha256": task.sha256_hash,
             }
         finally:
             loop.close()
-            
+
     except Exception as e:
         logger.error(f"Download failed for {url}: {e}")
         raise

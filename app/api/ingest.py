@@ -72,9 +72,10 @@ async def add_url(request: AddURLRequest) -> TaskResponse:
         db.save_task(task)
 
         # Dispatch to Celery worker for download
-        from app.workers.tasks import download_file_task
+        from backend.workers.tasks import download_file_task
+
         celery_task = download_file_task.delay(request.url, abs_dest_path)
-        
+
         logger.info(f"Added URL to queue: {request.url}, task_id={celery_task.id}")
 
         return TaskResponse(
@@ -152,6 +153,9 @@ async def update_task_status(request: UpdateStatusRequest) -> TaskResponse:
         db.update_status(url, new_status)
 
         task = db.get_task(url)
+
+        if task is None:
+            raise HTTPException(status_code=404, detail=f"Task not found for URL: {url}")
 
         return TaskResponse(
             url=task.url,

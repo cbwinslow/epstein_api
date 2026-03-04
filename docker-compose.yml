@@ -93,6 +93,8 @@ services:
       - EPSTEIN_DATABASE__SQLITE_PATH=/data/state.db
       - EPSTEIN_STORAGE__DATA_DIR=/data
       - EPSTEIN_CHROMADB__PERSIST_DIRECTORY=/data/chromadb
+      - EPSTEIN_CELERY__BROKER_URL=redis://redis:6379/0
+      - EPSTEIN_CELERY__RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - ./data:/data
     depends_on:

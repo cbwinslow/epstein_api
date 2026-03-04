@@ -100,8 +100,8 @@ class DownloadTask:
     """Represents a download task in the ledger."""
 
     id: str | None = None
-    source_url: str = ""
-    local_filepath: str = ""
+    url: str = ""
+    dest_path: str = ""
     status: DownloadStatus = DownloadStatus.PENDING
     bytes_downloaded: int = 0
     total_bytes: int | None = None
@@ -143,8 +143,8 @@ class DownloadLedger:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS download_tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    source_url TEXT UNIQUE NOT NULL,
-                    local_filepath TEXT NOT NULL,
+                    url TEXT UNIQUE NOT NULL,
+                    dest_path TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'PENDING',
                     bytes_downloaded INTEGER DEFAULT 0,
                     total_bytes INTEGER,
@@ -169,34 +169,34 @@ class DownloadLedger:
 
     async def create_task(
         self,
-        source_url: str,
-        local_filepath: str,
+        url: str,
+        dest_path: str,
     ) -> DownloadTask:
         """Create a new download task."""
         async with aiosqlite.connect(self._db_path) as db:
             cursor = await db.execute(
                 """
-                INSERT INTO download_tasks (source_url, local_filepath, status)
+                INSERT INTO download_tasks (url, dest_path, status)
                 VALUES (?, ?, ?)
                 """,
-                (source_url, local_filepath, DownloadStatus.PENDING.value),
+                (url, dest_path, DownloadStatus.PENDING.value),
             )
             await db.commit()
             task_id = cursor.lastrowid
 
         return DownloadTask(
             id=task_id,
-            source_url=source_url,
-            local_filepath=local_filepath,
+            url=url,
+            dest_path=dest_path,
             status=DownloadStatus.PENDING,
         )
 
     async def get_task_by_url(self, url: str) -> DownloadTask | None:
         """Get a task by URL."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute(
-                "SELECT * FROM download_tasks WHERE source_url = ?",
+                "SELECT * FROM download_tasks WHERE url = ?",
                 (url,),
             ) as cursor:
                 row = await cursor.fetchone()
@@ -207,7 +207,7 @@ class DownloadLedger:
     async def get_task_by_hash(self, hash_value: str) -> DownloadTask | None:
         """Get a task by SHA-256 hash (for deduplication)."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM download_tasks WHERE sha256_hash = ? AND status = ?",
                 (hash_value, DownloadStatus.COMPLETED.value),
@@ -220,7 +220,7 @@ class DownloadLedger:
     async def get_incomplete_tasks(self) -> list[DownloadTask]:
         """Get all incomplete tasks for resume on startup."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute(
                 """
                 SELECT * FROM download_tasks 
@@ -244,7 +244,7 @@ class DownloadLedger:
                     retry_count = ?,
                     error_message = ?,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE source_url = ?
+                WHERE url = ?
                 """,
                 (
                     task.status.value,
@@ -253,7 +253,7 @@ class DownloadLedger:
                     task.sha256_hash,
                     task.retry_count,
                     task.error_message,
-                    task.source_url,
+                    task.url,
                 ),
             )
             await db.commit()
@@ -261,25 +261,22 @@ class DownloadLedger:
     async def get_all_tasks(self) -> list[DownloadTask]:
         """Get all tasks."""
         async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiohttp.NamedTupleRow
+            db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM download_tasks") as cursor:
                 rows = await cursor.fetchall()
                 return [self._row_to_task(row) for row in rows]
 
     def _row_to_task(self, row: Any) -> DownloadTask:
         """Convert database row to DownloadTask."""
+        # Convert sqlite3.Row to dict
+        row_dict = dict(row)
         return DownloadTask(
-            id=row.id,
-            source_url=row.source_url,
-            local_filepath=row.local_filepath,
-            status=DownloadStatus(row.status),
-            bytes_downloaded=row.bytes_downloaded,
-            total_bytes=row.total_bytes,
-            sha256_hash=row.sha256_hash,
-            retry_count=row.retry_count,
-            error_message=row.error_message,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
+            url=row_dict["url"],
+            dest_path=row_dict["dest_path"],
+            status=DownloadStatus(row_dict["status"]),
+            sha256_hash=row_dict.get("sha256_hash"),
+            retry_count=row_dict.get("retries", 0),
+            error_message=row_dict.get("error_message"),
         )
 
 
@@ -319,7 +316,7 @@ class AsyncDownloader:
         logger.info(f"Found {len(incomplete)} incomplete downloads to resume")
 
         for task in incomplete:
-            await self.download(task.source_url, Path(task.local_filepath))
+            await self.download(task.url, Path(task.dest_path))
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -368,8 +365,8 @@ class AsyncDownloader:
                     return existing_task
 
             task = existing_task or await self._ledger.create_task(
-                source_url=url,
-                local_filepath=str(dest_path),
+                url=url,
+                dest_path=str(dest_path),
             )
 
             task = await self._download_with_retry(task, dest_path)
@@ -396,10 +393,10 @@ class AsyncDownloader:
             task.error_message = str(e)
             if task.retry_count >= self._settings.downloader.max_retries:
                 task.status = DownloadStatus.FAILED
-                logger.error(f"Download failed after {task.retry_count} retries: {task.source_url}")
+                logger.error(f"Download failed after {task.retry_count} retries: {task.url}")
             else:
                 logger.warning(
-                    f"Retry {task.retry_count}/{self._settings.downloader.max_retries} for {task.source_url}"
+                    f"Retry {task.retry_count}/{self._settings.downloader.max_retries} for {task.url}"
                 )
                 raise
             return task
@@ -420,19 +417,19 @@ class AsyncDownloader:
             existing_size = dest_path.stat().st_size
             task.bytes_downloaded = existing_size
             headers["Range"] = f"bytes={existing_size}-"
-            logger.info(f"Resuming download from byte {existing_size}: {task.source_url}")
+            logger.info(f"Resuming download from byte {existing_size}: {task.url}")
 
         sha256_hash = hashlib.sha256()
         downloaded = task.bytes_downloaded
         total_bytes: int | None = None
 
         try:
-            async with session.get(task.source_url, headers=headers) as response:
+            async with session.get(task.url, headers=headers) as response:
                 if response.status == 416:  # Range not satisfiable
                     dest_path.unlink()
                     downloaded = 0
                     task.bytes_downloaded = 0
-                    async with session.get(task.source_url) as response:
+                    async with session.get(task.url) as response:
                         total_bytes = int(response.headers.get("Content-Length", 0))
                         task.total_bytes = total_bytes
                         async for chunk in response.content.iter_chunked(
@@ -467,27 +464,27 @@ class AsyncDownloader:
                 final_hash = sha256_hash.hexdigest()
 
                 existing_with_hash = await self._ledger.get_task_by_hash(final_hash)
-                if existing_with_hash and existing_with_hash.source_url != task.source_url:
+                if existing_with_hash and existing_with_hash.url != task.url:
                     task.status = DownloadStatus.DUPLICATE
                     dest_path.unlink()
                     logger.info(f"Duplicate detected: {final_hash}")
                 else:
                     task.sha256_hash = final_hash
                     task.status = DownloadStatus.COMPLETED
-                    logger.info(f"Downloaded: {task.source_url} -> {dest_path} ({final_hash})")
+                    logger.info(f"Downloaded: {task.url} -> {dest_path} ({final_hash})")
 
         except asyncio.TimeoutError as e:
             task.status = DownloadStatus.FAILED
             task.error_message = "Timeout"
             raise DownloadTimeoutError(
-                url=task.source_url,
+                url=task.url,
                 timeout_seconds=self._settings.downloader.timeout,
             ) from e
         except aiohttp.ClientError as e:
             task.status = DownloadStatus.FAILED
             task.error_message = str(e)
             raise DownloadFailedError(
-                url=task.source_url,
+                url=task.url,
                 reason=str(e),
                 retries=task.retry_count,
             ) from e
@@ -504,7 +501,7 @@ class AsyncDownloader:
         if self._progress_callback and total_bytes > 0:
             percentage = (task.bytes_downloaded / total_bytes) * 100
             progress = DownloadProgress(
-                url=task.source_url,
+                url=task.url,
                 bytes_downloaded=task.bytes_downloaded,
                 total_bytes=total_bytes,
                 percentage=percentage,

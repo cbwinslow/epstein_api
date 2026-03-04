@@ -10,7 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy dependency files first
 COPY pyproject.toml uv.lock .python-version ./
 
-# Install uv and dependencies (use pip cache from previous builds)
+# Copy cached venv if available (ignore errors if it doesn't exist)
+RUN if [ -d .venv ]; then cp -r .venv .venv; fi
+
+# Install uv and sync dependencies
 RUN pip install --upgrade pip && \
     pip install uv && \
     uv python pin 3.10 && \

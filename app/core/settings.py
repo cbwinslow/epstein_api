@@ -19,7 +19,7 @@ class StorageConfig(BaseModel):
     downloads_dir: Path = Path("./data/downloads")
     processed_dir: Path = Path("./data/processed")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def resolve_paths(self):
         """Resolve paths based on environment or Docker mount."""
         # Check env var first
@@ -30,7 +30,7 @@ class StorageConfig(BaseModel):
                 data_dir = "/data"
             else:
                 data_dir = str(self.data_dir)
-        
+
         self.data_dir = Path(data_dir)
         self.downloads_dir = self.data_dir / "downloads"
         self.processed_dir = self.data_dir / "processed"
@@ -40,7 +40,7 @@ class StorageConfig(BaseModel):
 class DatabaseConfig(BaseModel):
     sqlite_path: Path = Path("./data/state.db")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def resolve_path(self):
         """Resolve path based on environment or Docker mount."""
         # Check env var first
@@ -51,7 +51,7 @@ class DatabaseConfig(BaseModel):
                 sqlite_path = "/data/state.db"
             else:
                 sqlite_path = str(self.sqlite_path)
-        
+
         self.sqlite_path = Path(sqlite_path)
         return self
 
@@ -70,7 +70,7 @@ class CeleryConfig(BaseModel):
 class ChromaDBConfig(BaseModel):
     persist_directory: Path = Path("./data/chromadb")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def resolve_path(self):
         """Resolve path based on environment or Docker mount."""
         # Check env var first
@@ -81,7 +81,7 @@ class ChromaDBConfig(BaseModel):
                 persist_dir = "/data/chromadb"
             else:
                 persist_dir = str(self.persist_directory)
-        
+
         self.persist_directory = Path(persist_dir)
         return self
 
@@ -177,5 +177,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    config_path = Path(__file__).parent / "config.yaml"
+    # Config is in /app/config.yaml (not /app/core/config.yaml)
+    # Due to symlink: backend -> . (in /app), backend/core/settings.py resolves to core/settings.py
+    config_path = Path(__file__).parent.parent.parent / "config.yaml"
     return Settings.from_yaml(config_path)

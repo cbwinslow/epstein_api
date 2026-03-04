@@ -11,6 +11,7 @@ class MigrationVersion(Enum):
     V1_INITIAL = "v1_initial"
     V2_ADD_RELATIONSHIPS = "v2_add_relationships"
     V3_PROCESSING_FIELDS = "v3_processing_fields"
+    V4_DOWNLOAD_FIELDS = "v4_download_fields"
 
 
 MIGRATIONS: dict[MigrationVersion, str] = {
@@ -72,6 +73,29 @@ MIGRATIONS: dict[MigrationVersion, str] = {
         ALTER TABLE download_tasks ADD COLUMN processing_method TEXT;
         ALTER TABLE download_tasks ADD COLUMN file_id INTEGER;
         CREATE INDEX IF NOT EXISTS idx_download_tasks_id ON download_tasks(file_id);
+    """,
+    
+    MigrationVersion.V4_DOWNLOAD_FIELDS: """
+        -- Add bytes_downloaded column if not exists (SQLite way)
+        CREATE TABLE IF NOT EXISTS download_tasks_new (
+            url TEXT PRIMARY KEY,
+            dest_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'PENDING',
+            retries INTEGER DEFAULT 0,
+            error_message TEXT,
+            sha256_hash TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            processing_method TEXT,
+            file_id INTEGER,
+            bytes_downloaded INTEGER DEFAULT 0,
+            total_bytes INTEGER,
+            retry_count INTEGER DEFAULT 0
+        );
+        -- Copy data if old table exists
+        INSERT OR IGNORE INTO download_tasks_new SELECT * FROM download_tasks;
+        DROP TABLE IF EXISTS download_tasks;
+        ALTER TABLE download_tasks_new RENAME TO download_tasks;
     """,
 }
 

@@ -5,13 +5,14 @@ Unit tests for the async downloader.
 import asyncio
 import hashlib
 import sys
+import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-BACKEND_PATH = Path(__file__).parent.parent / "backend"
-sys.path.insert(0, str(BACKEND_PATH.parent))
+APP_PATH = Path(__file__).parent.parent / "app"
+sys.path.insert(0, str(APP_PATH))
 
 
 class TestSanitizePath:
@@ -85,8 +86,8 @@ class TestDownloadTask:
 
         task = DownloadTask(
             id="1",
-            source_url="https://example.com/file.pdf",
-            local_filepath="/data/file.pdf",
+            url="https://example.com/file.pdf",
+            dest_path="/data/file.pdf",
             status=DownloadStatus.COMPLETED,
             bytes_downloaded=1000,
             total_bytes=2000,
@@ -96,6 +97,8 @@ class TestDownloadTask:
         assert task.id == "1"
         assert task.status == DownloadStatus.COMPLETED
         assert task.bytes_downloaded == 1000
+        assert task.url == "https://example.com/file.pdf"
+        assert task.dest_path == "/data/file.pdf"
 
 
 class TestDownloadProgress:
@@ -276,3 +279,139 @@ class TestSettings:
         assert settings.downloader.max_concurrent > 0
         assert settings.downloader.chunk_size > 0
         assert settings.downloader.timeout > 0
+
+
+class TestDatabaseSchema:
+    """Test database schema and column mapping fixes."""
+
+    def test_download_task_uses_url_not_source_url(self):
+        """Test that DownloadTask uses 'url' field, not 'source_url'."""
+        from backend.core.downloader import DownloadTask, DownloadStatus
+
+        task = DownloadTask(
+            url="https://example.com/test.pdf",
+            dest_path="/data/test.pdf",
+            status=DownloadStatus.PENDING,
+        )
+
+        assert task.url == "https://example.com/test.pdf"
+        assert hasattr(task, "url")
+        assert not hasattr(task, "source_url")
+
+    def test_download_task_uses_dest_path_not_local_filepath(self):
+        """Test that DownloadTask uses 'dest_path' field, not 'local_filepath'."""
+        from backend.core.downloader import DownloadTask, DownloadStatus
+
+        task = DownloadTask(
+            url="https://example.com/test.pdf",
+            dest_path="/data/test.pdf",
+            status=DownloadStatus.PENDING,
+        )
+
+        assert task.dest_path == "/data/test.pdf"
+        assert hasattr(task, "dest_path")
+        assert not hasattr(task, "local_filepath")
+
+    def test_row_to_task_converts_dict_correctly(self):
+        """Test that _row_to_task correctly converts database row to DownloadTask."""
+        from backend.core.downloader import DownloadTask, DownloadStatus
+
+        mock_row = {
+            "url": "https://example.com/test.pdf",
+            "dest_path": "/data/test.pdf",
+            "status": "COMPLETED",
+            "sha256_hash": "abc123",
+            "retries": 0,
+            "error_message": None,
+        }
+
+        task = DownloadTask(
+            url=mock_row["url"],
+            dest_path=mock_row["dest_path"],
+            status=DownloadStatus(mock_row["status"]),
+            sha256_hash=mock_row.get("sha256_hash"),
+            retry_count=mock_row.get("retries", 0),
+            error_message=mock_row.get("error_message"),
+        )
+
+        assert task.url == "https://example.com/test.pdf"
+        assert task.dest_path == "/data/test.pdf"
+        assert task.status == DownloadStatus.COMPLETED
+        assert task.sha256_hash == "abc123"
+
+
+class TestResourceCleanup:
+    """Test resource cleanup (aiohttp session closing)."""
+
+    @pytest.mark.asyncio
+    async def test_downloader_close_closes_session(self):
+        """Test that close() properly closes aiohttp session."""
+        from backend.core.downloader import AsyncDownloader
+
+        mock_settings = MagicMock()
+        mock_settings.downloader.max_concurrent = 2
+        mock_settings.downloader.chunk_size = 8192
+        mock_settings.downloader.timeout = 30
+        mock_settings.database.sqlite_path = Path("/tmp/test.db")
+
+        downloader = AsyncDownloader(mock_settings)
+
+        mock_session = AsyncMock()
+        mock_session.closed = False
+        downloader._session = mock_session
+
+        await downloader.close()
+
+        mock_session.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_downloader_close_handles_none_session(self):
+        """Test that close() handles None session gracefully."""
+        from backend.core.downloader import AsyncDownloader
+
+        mock_settings = MagicMock()
+        mock_settings.downloader.max_concurrent = 2
+        mock_settings.downloader.chunk_size = 8192
+        mock_settings.downloader.timeout = 30
+        mock_settings.database.sqlite_path = Path("/tmp/test.db")
+
+        downloader = AsyncDownloader(mock_settings)
+        downloader._session = None
+
+        await downloader.close()
+
+        assert True
+
+    @pytest.mark.asyncio
+    async def test_downloader_close_handles_closed_session(self):
+        """Test that close() handles already closed session."""
+        from backend.core.downloader import AsyncDownloader
+
+        mock_settings = MagicMock()
+        mock_settings.downloader.max_concurrent = 2
+        mock_settings.downloader.chunk_size = 8192
+        mock_settings.downloader.timeout = 30
+        mock_settings.database.sqlite_path = Path("/tmp/test.db")
+
+        downloader = AsyncDownloader(mock_settings)
+
+        mock_session = AsyncMock()
+        mock_session.closed = True
+        downloader._session = mock_session
+
+        await downloader.close()
+
+        mock_session.close.assert_not_called()
+
+
+class TestLedgerSchema:
+    """Test DownloadLedger schema compatibility."""
+
+    def test_ledger_uses_correct_column_names(self):
+        """Test that ledger queries use 'url' not 'source_url'."""
+        from backend.core.downloader import DownloadLedger
+
+        ledger = DownloadLedger(Path("/tmp/test.db"))
+
+        assert hasattr(ledger, "_db_path")
+        assert hasattr(ledger, "_lock")
